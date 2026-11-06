@@ -11,9 +11,14 @@ keywords.workspace = true
 exclude.workspace = true
 edition.workspace = true
 
+# No Criterion benches in this package. Skip the default libtest bench harness.
+[lib]
+bench = false
+
 [[bin]]
 name = "rops"
 path = "src/main.rs"
+bench = false
 
 [features]
 test-utils = ["rops/test-utils"]
@@ -41,3 +46,6 @@ rops = { path = "../lib", features = ["test-utils"] }
 pretty_assertions.workspace = true
 serial_test.workspace = true
 test-binary.workspace = true
+
+[lints]
+workspace = true

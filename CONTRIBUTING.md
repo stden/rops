@@ -25,7 +25,7 @@ cargo fmt -- --check
 taplo fmt --check --diff
 
 # Make sure things follow common linting recommendations
-cargo clippy --all-features --tests -- -D warnings
+cargo clippy --all-features --tests --benches -- -D warnings
 
 # Check documentation
 RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features --workspace --exclude rops-cli
@@ -35,6 +35,14 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features --workspace --excl
 # mdbook test
 # # https://github.com/crate-ci/typos
 # typos
+```
+
+### Running benchmarks
+
+Encrypt and decrypt benchmarks live in the library crate:
+
+```sh
+cargo bench -p rops
 ```
 
 ### Running tests
