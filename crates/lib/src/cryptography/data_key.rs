@@ -1,7 +1,7 @@
 use derive_more::{AsMut, AsRef};
-use generic_array::{
+use hybrid_array::{
     typenum::{Unsigned, U32},
-    GenericArray,
+    Array,
 };
 use zeroize::Zeroize;
 
@@ -47,21 +47,20 @@ impl TryFrom<Vec<u8>> for DataKey {
             return Err(DataKeySizeError(DataKey::byte_size(), vec.len()));
         }
 
-        GenericArray::from_exact_iter(vec)
-            .map(|array| Ok(Self(RngKey(array))))
-            .expect("invalid data key size assertion")
+        let array = Array::try_from_iter(vec).expect("invalid data key size assertion");
+        Ok(Self(RngKey(array)))
     }
 }
 
 #[cfg(feature = "test-utils")]
 mod mock {
-    use generic_array::GenericArray;
+    use hybrid_array::Array;
 
     use crate::*;
 
     impl MockTestUtil for DataKey {
         fn mock() -> Self {
-            Self(RngKey(GenericArray::from([
+            Self(RngKey(Array::from([
                 254, 79, 93, 103, 195, 165, 169, 238, 35, 187, 236, 95, 222, 243, 40, 26, 130, 128, 59, 176, 15, 195, 55, 93, 129, 212, 57,
                 80, 15, 181, 72, 114,
             ])))

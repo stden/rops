@@ -1,13 +1,13 @@
-use generic_array::{ArrayLength, GenericArray};
+use hybrid_array::{Array, ArraySize};
 
 pub trait Hasher: private::SealedHasher {
-    type OutputSize: ArrayLength<u8>;
+    type OutputSize: ArraySize;
 
     fn new() -> Self;
 
     fn update(&mut self, input: impl AsRef<[u8]>);
 
-    fn finalize(self) -> GenericArray<u8, Self::OutputSize>;
+    fn finalize(self) -> Array<u8, Self::OutputSize>;
 }
 
 mod private {

@@ -16,7 +16,7 @@ impl Hasher for SHA512 {
         self.0.update(input)
     }
 
-    fn finalize(self) -> generic_array::GenericArray<u8, Self::OutputSize> {
+    fn finalize(self) -> hybrid_array::Array<u8, Self::OutputSize> {
         self.0.finalize()
     }
 }

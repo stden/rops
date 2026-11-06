@@ -13,7 +13,7 @@ const MAC_ENCRYPTED_ONLY_INIT_BYTES: [u8; 32] = [
 // size. The buffer contains in other words UTF-8 byte codes the hex string encoded from the
 // computed MAC, and not the computed MAC itself.
 //
-// TEMP(HACK): Inner buffer should ideally be a GenericArray<u8, Sum<H::OutputSize, H::OutputSize>>.
+// TEMP(HACK): Inner buffer should ideally be an Array<u8, Sum<H::OutputSize, H::OutputSize>>.
 // But because where clauses aren't inferred in any function signature containing Mac<H>, a Vec is
 // used instead. https://github.com/rust-lang/rust/issues/20671
 //

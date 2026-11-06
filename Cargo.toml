@@ -13,33 +13,33 @@ readme = "README.md"
 version = "0.1.7"
 
 [workspace.dependencies]
-aes-gcm = { version = "0.10", features = ["std"] }
-age = "0.11"
+aes-gcm = { version = "0.11" }
+age = "0.12"
 anyhow = "1"
 aws-arn = "0.3"
-aws-sdk-kms = { version = "1.106", features = ["behavior-version-latest"] }
-base64 = "0.22"
+aws-sdk-kms = { version = "1.129", features = ["behavior-version-latest"] }
+base64 = "0.23"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
 console = "0.16"
 ctrlc = "3"
 derive_more = { version = "2.1", features = ["display", "from", "deref", "deref_mut", "into", "as_ref"] }
 directories = "6"
-generic-array = "0.14"
+hybrid-array = { version = "0.4", features = ["zeroize"] }
 hex = "0.4"
-impl-tools = "0.11"
+impl-tools = "0.13"
 indexmap = "2"
 indoc = "2"
 pretty_assertions = "1"
-rand = "0.9"
+rand = "0.10"
 regex = "1"
 serde = { version = "1", features = ["derive"] }
 serde_regex = "1"
 serde_with = "3"
 serde_yaml = "0.9"
 serde_json = "1"
-serial_test = { version = "3", default-features = false }
-sha2 = "0.10"
+serial_test = { version = "4", default-features = false }
+sha2 = "0.11"
 shlex = "2.0.1"
 strum = { version = "0.28", features = ["derive"] }
 tempfile = "3"
@@ -47,7 +47,7 @@ test-binary = "3"
 textwrap = "0.16"
 thiserror = "2"
 tokio = "1"
-toml = "1.1"
+toml = "1.2"
 walkdir = "2"
 which = "8"
-zeroize = { version = "1.8" }
+zeroize = { version = "1.9" }

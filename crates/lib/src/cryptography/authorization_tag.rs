@@ -2,14 +2,14 @@ use std::str::FromStr;
 
 use aes_gcm::Tag;
 use derive_more::{AsMut, From};
-use generic_array::GenericArray;
+use hybrid_array::Array;
 
 use crate::*;
 
 #[derive(AsMut, From)]
 #[as_mut([u8])]
 #[impl_tools::autoimpl(Debug, PartialEq)]
-pub struct AuthorizationTag<C: Cipher>(GenericArray<u8, C::AuthorizationTagSize>);
+pub struct AuthorizationTag<C: Cipher>(Array<u8, C::AuthorizationTagSize>);
 
 impl<C: Cipher> AsRef<Tag<C::AuthorizationTagSize>> for AuthorizationTag<C> {
     fn as_ref(&self) -> &Tag<C::AuthorizationTagSize> {
@@ -21,7 +21,7 @@ impl<C: Cipher> FromStr for AuthorizationTag<C> {
     type Err = Base64DecodeError;
 
     fn from_str(base64_str: &str) -> Result<Self, Self::Err> {
-        let mut buffer = Self(GenericArray::default());
+        let mut buffer = Self(Array::default());
         buffer.as_mut().decode_base64(base64_str).map(|_| buffer)
     }
 }

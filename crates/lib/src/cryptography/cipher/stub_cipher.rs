@@ -1,4 +1,4 @@
-use generic_array::typenum::U32;
+use hybrid_array::typenum::U32;
 
 use crate::*;
 

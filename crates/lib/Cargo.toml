@@ -33,7 +33,7 @@ base64.workspace = true
 chrono.workspace = true
 derive_more.workspace = true
 directories.workspace = true
-generic-array.workspace = true
+hybrid-array.workspace = true
 hex.workspace = true
 impl-tools.workspace = true
 indexmap = { workspace = true, features = ["serde"] }

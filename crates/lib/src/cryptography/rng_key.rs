@@ -1,13 +1,13 @@
 use derive_more::{AsMut, AsRef};
-use generic_array::{ArrayLength, GenericArray};
-use rand::RngCore;
+use hybrid_array::{Array, ArraySize};
+use rand::Rng;
 
 // IMPROVEMENT: replace with generic array
 #[derive(Debug, Clone, PartialEq, AsRef, AsMut)]
 #[as_ref(forward)]
-pub struct RngKey<T: ArrayLength<u8>>(pub(crate) GenericArray<u8, T>);
+pub struct RngKey<T: ArraySize>(pub(crate) Array<u8, T>);
 
-impl<T: ArrayLength<u8>> RngKey<T> {
+impl<T: ArraySize> RngKey<T> {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         // Assumed to be cryptographically secure. Uses ChaCha12 as
@@ -17,23 +17,23 @@ impl<T: ArrayLength<u8>> RngKey<T> {
         // https://docs.rs/rand/latest/rand/rngs/struct.ThreadRng.html
         let mut rand = rand::rng();
 
-        let mut inner = GenericArray::default();
+        let mut inner = Array::default();
         rand.fill_bytes(&mut inner);
         Self(inner)
     }
 
     pub fn empty() -> Self {
-        Self(GenericArray::default())
+        Self(Array::default())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use generic_array::typenum::Unsigned;
+    use hybrid_array::typenum::Unsigned;
 
     use super::*;
 
-    type MockArrayLength = generic_array::typenum::U32;
+    type MockArrayLength = hybrid_array::typenum::U32;
     type MockRngKey = RngKey<MockArrayLength>;
 
     #[test]

@@ -1,15 +1,15 @@
 use std::fmt::Debug;
 
-use generic_array::ArrayLength;
+use hybrid_array::ArraySize;
 
 use crate::*;
 
 pub trait Cipher: Sized + private::SealedCipher {
     const NAME: &'static str;
 
-    type NonceSize: ArrayLength<u8> + Debug + PartialEq;
+    type NonceSize: ArraySize + Debug + PartialEq;
 
-    type AuthorizationTagSize: ArrayLength<u8> + Debug + PartialEq;
+    type AuthorizationTagSize: ArraySize + Debug + PartialEq;
 
     type Error: std::error::Error + Send + Sync + 'static;
 

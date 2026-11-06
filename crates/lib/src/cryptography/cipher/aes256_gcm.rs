@@ -1,5 +1,5 @@
-use aes_gcm::{aes::Aes256, AeadCore, AeadInPlace, Aes256Gcm, AesGcm, Key, KeyInit};
-use generic_array::typenum::U32;
+use aes_gcm::{aes::Aes256, AeadCore, AeadInOut, Aes256Gcm, AesGcm, Key, KeyInit};
+use hybrid_array::{typenum::U32, Array, ArraySize};
 
 use crate::*;
 
@@ -8,8 +8,13 @@ pub struct AES256GCM;
 
 impl AES256GCM {
     pub fn cipher(data_key: &DataKey) -> AesGcm<Aes256, <Self as Cipher>::NonceSize, <Self as Cipher>::AuthorizationTagSize> {
-        AesGcm::new(Key::<Aes256Gcm>::from_slice(data_key.as_ref()))
+        let key = Key::<Aes256Gcm>::try_from(data_key.as_ref()).expect("data key length matches the AES-256 key size");
+        AesGcm::new(&key)
     }
+}
+
+fn aes_nonce<T: ArraySize>(nonce: &Nonce<T>) -> &Array<u8, T> {
+    <&Array<u8, T>>::try_from(nonce.as_ref()).expect("nonce length matches the AES-GCM nonce size")
 }
 
 impl Cipher for AES256GCM {
@@ -28,7 +33,7 @@ impl Cipher for AES256GCM {
         associated_data: &[u8],
     ) -> Result<AuthorizationTag<Self>, Self::Error> {
         Self::cipher(data_key)
-            .encrypt_in_place_detached(nonce.as_ref().into(), associated_data, in_place_buffer)
+            .encrypt_inout_detached(aes_nonce(nonce), associated_data, in_place_buffer.into())
             .map(Into::into)
     }
 
@@ -39,10 +44,10 @@ impl Cipher for AES256GCM {
         associated_data: &[u8],
         authorization_tag: &AuthorizationTag<Self>,
     ) -> Result<(), Self::Error> {
-        Self::cipher(data_key).decrypt_in_place_detached(
-            nonce.as_ref().into(),
+        Self::cipher(data_key).decrypt_inout_detached(
+            aes_nonce(nonce),
             associated_data,
-            in_place_buffer,
+            in_place_buffer.into(),
             authorization_tag.as_ref(),
         )
     }
