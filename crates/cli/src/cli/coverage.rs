@@ -91,22 +91,43 @@ fn encrypted_yaml() -> (EnvGuard, NamedTempFile) {
     (env, file)
 }
 
-struct Immutable {
+/// Changes a path's mode until dropped, then restores the original mode.
+struct ModeGuard {
     path: std::path::PathBuf,
+    original: std::fs::Permissions,
 }
 
-impl Immutable {
-    fn set(path: &Path) -> Self {
-        let status = std::process::Command::new("chattr").arg("+i").arg(path).status().unwrap();
-        assert!(status.success(), "chattr +i");
-        Self { path: path.to_path_buf() }
+impl ModeGuard {
+    /// Applies `mode` to `path`. Returns `None` when `denied` still succeeds, because root ignores mode bits.
+    fn if_enforced(path: &Path, mode: u32, denied: fn(&Path) -> bool) -> Option<Self> {
+        let guard = Self {
+            path: path.to_path_buf(),
+            original: std::fs::metadata(path).unwrap().permissions(),
+        };
+        std::fs::set_permissions(path, std::os::unix::fs::PermissionsExt::from_mode(mode)).unwrap();
+        if denied(path) {
+            return Some(guard);
+        }
+        eprintln!(
+            "skipped: {} is still accessible with mode {mode:o}, permissions are not enforced for this user",
+            path.display()
+        );
+        None
     }
 }
 
-impl Drop for Immutable {
+impl Drop for ModeGuard {
     fn drop(&mut self) {
-        let _ = std::process::Command::new("chattr").arg("-i").arg(&self.path).status();
+        let _ = std::fs::set_permissions(&self.path, self.original.clone());
     }
+}
+
+fn write_denied(path: &Path) -> bool {
+    std::fs::OpenOptions::new().write(true).open(path).is_err()
+}
+
+fn create_denied(directory: &Path) -> bool {
+    tempfile::tempfile_in(directory).is_err()
 }
 
 fn write_script(body: &str) -> (tempfile::TempDir, std::path::PathBuf) {
@@ -189,7 +210,9 @@ fn encrypts_with_partial_encryption_and_reports_failures() {
     })
     .is_err());
 
-    let _immutable = Immutable::set(plaintext.path());
+    let Some(_read_only) = ModeGuard::if_enforced(plaintext.path(), 0o444, write_denied) else {
+        return;
+    };
     assert!(Cli::encrypt(EncryptArgs {
         integration_keys: only_age(),
         partial_encryption_args: None,
@@ -227,7 +250,9 @@ fn decrypts_and_reports_key_and_write_failures() {
     .is_err());
 
     let (_restored, writable) = encrypted_yaml();
-    let _immutable = Immutable::set(writable.path());
+    let Some(_read_only) = ModeGuard::if_enforced(writable.path(), 0o444, write_denied) else {
+        return;
+    };
     assert!(Cli::decrypt(DecryptArgs {
         input_args: input(writable.path(), Format::Yaml),
         in_place: Some(true),
@@ -299,14 +324,16 @@ fn adds_and_removes_keys_and_reports_failures() {
     .is_err());
 
     let unwritable = write_temp(&std::fs::read_to_string(file.path()).unwrap());
-    let _immutable = Immutable::set(unwritable.path());
+    let Some(_read_only) = ModeGuard::if_enforced(unwritable.path(), 0o444, write_denied) else {
+        return;
+    };
     assert!(Cli::keys(KeysSubcommand::Add(KeyInputArgs {
         integration_keys: only_age(),
         format: Some(Format::Yaml),
         file: unwritable.path().to_path_buf(),
     }))
     .is_err());
-    drop(_immutable);
+    drop(_read_only);
 
     assert!(Cli::keys(KeysSubcommand::Remove(KeyInputArgs {
         integration_keys: only_age(),
@@ -325,7 +352,9 @@ fn adds_and_removes_keys_and_reports_failures() {
 
     let _age = age_env();
     let rewrite = write_temp(&std::fs::read_to_string(added.path()).unwrap());
-    let _immutable = Immutable::set(rewrite.path());
+    let Some(_read_only) = ModeGuard::if_enforced(rewrite.path(), 0o444, write_denied) else {
+        return;
+    };
     assert!(Cli::keys(KeysSubcommand::Remove(KeyInputArgs {
         integration_keys: IntegrationKeys {
             age: vec![<AgeIntegration as Integration>::KeyId::mock_other()],
@@ -450,7 +479,9 @@ fn refreshes_matching_rules_and_reports_failures() {
     .is_err());
 
     let rewrite = write_temp(&source);
-    let _immutable = Immutable::set(rewrite.path());
+    let Some(_read_only) = ModeGuard::if_enforced(rewrite.path(), 0o444, write_denied) else {
+        return;
+    };
     let config = store_config(&config_with(only_age(), None, None, ".*"));
     assert!(Cli::refresh(RefreshArgs {
         input_args: InputArgs {
@@ -637,30 +668,6 @@ impl Drop for CwdGuard {
     }
 }
 
-struct Tmpfs {
-    path: std::path::PathBuf,
-}
-
-impl Tmpfs {
-    fn full() -> Self {
-        let path = tempfile::tempdir().unwrap().keep();
-        let status = std::process::Command::new("mount")
-            .args(["-t", "tmpfs", "-o", "size=8192", "tmpfs", path.to_str().unwrap()])
-            .status()
-            .unwrap();
-        assert!(status.success(), "mount tmpfs");
-        let _ = std::fs::write(path.join("fill"), vec![0u8; 8192]);
-        Self { path }
-    }
-}
-
-impl Drop for Tmpfs {
-    fn drop(&mut self) {
-        let _ = std::process::Command::new("umount").arg(&self.path).status();
-        let _ = std::fs::remove_dir_all(&self.path);
-    }
-}
-
 #[test]
 #[serial_test::serial(config_retrieval)]
 fn edit_reports_decrypt_tempfile_and_write_failures() {
@@ -675,20 +682,24 @@ fn edit_reports_decrypt_tempfile_and_write_failures() {
 
     let (_age, file) = encrypted_yaml();
     let (_dir, editor) = write_script("printf 'hello: world\\n' > \"$1\"");
-    let _immutable = Immutable::set(file.path());
+    let Some(_read_only) = ModeGuard::if_enforced(file.path(), 0o444, write_denied) else {
+        return;
+    };
     assert!(edit_file(&editor, file.path()).is_err());
-    drop(_immutable);
+    drop(_read_only);
 
     let directory = tempfile::tempdir().unwrap();
     let _cwd = CwdGuard::enter(directory.path());
-    let _frozen = Immutable::set(directory.path());
+    let Some(_read_only_directory) = ModeGuard::if_enforced(directory.path(), 0o555, create_denied) else {
+        return;
+    };
     assert!(edit_file(&editor, file.path()).is_err());
-    drop(_frozen);
+    drop(_read_only_directory);
     drop(_cwd);
 
-    let filesystem = Tmpfs::full();
-    let _cwd = CwdGuard::enter(&filesystem.path);
-    assert!(edit_file(&editor, file.path()).is_err());
+    // A full filesystem can only be forced with a mount, which needs root. A process-wide
+    // RLIMIT_FSIZE would also fail writes in the parallel tests, so this write error is skipped.
+    eprintln!("skipped: a full filesystem needs a mount (root), so the temp-file write error in `edit` is not exercised");
 }
 
 #[test]
