@@ -48,3 +48,17 @@ mod decoding {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_invalid_base64() {
+        let mut bytes = Vec::new();
+        assert!(bytes.decode_base64("%%%").is_err());
+
+        let mut array = [0u8; 8];
+        assert!(array.as_mut_slice().decode_base64("%%%").is_err());
+    }
+}

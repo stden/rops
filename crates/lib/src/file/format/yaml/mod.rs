@@ -9,6 +9,13 @@ use serde_yaml::{Mapping as YamlMap, Value as YamlValue};
 
 use crate::*;
 
+fn ensure_trailing_newline(mut yaml: String) -> String {
+    if !yaml.ends_with('\n') {
+        yaml.push('\n');
+    }
+    yaml
+}
+
 #[derive(Debug, PartialEq)]
 pub struct YamlFileFormat;
 
@@ -19,16 +26,28 @@ impl FileFormat for YamlFileFormat {
     type DeserializeError = serde_yaml::Error;
 
     fn serialize_to_string<T: Serialize>(t: &T) -> Result<String, Self::SerializeError> {
-        serde_yaml::to_string(t)
+        // serde_yaml 0.9 and SOPS write indentless block sequences (`key:\n- item`).
+        // noyalib indents the dash unless this flag is set.
+        // `prefer_single_quotes` matches serde_yaml 0.9, which writes an empty
+        // string as `''`.
+        let config = noyalib::SerializerConfig::new()
+            .compact_list_indent(true)
+            .prefer_single_quotes(true);
+        let yaml = noyalib::to_string_with_config(t, &config).map_err(serde_yaml::Error::from)?;
+        // serde_yaml 0.9 ends a document with a newline. noyalib does not.
+        Ok(ensure_trailing_newline(yaml))
     }
 
     fn deserialize_from_str<T: DeserializeOwned>(str: &str) -> Result<T, Self::DeserializeError> {
-        serde_yaml::from_str(str)
+        // `serde_yaml::from_str` requires `T: 'static`. Parse into `Value` first,
+        // then deserialize that tree so callers can stay `DeserializeOwned`.
+        let value = serde_yaml::from_str::<serde_yaml::Value>(str)?;
+        T::deserialize(serde_yaml::Deserializer::new(&value)).map_err(serde_yaml::Error::from)
     }
 }
 
 impl FileFormatMapAdapter for YamlMap {
-    type Key = YamlValue;
+    type Key = String;
     type Value = YamlValue;
 
     fn with_capacity(capacity: usize) -> Self {
@@ -40,28 +59,13 @@ impl FileFormatMapAdapter for YamlMap {
     }
 }
 
-impl FileFormatKeyAdapter for YamlValue {
-    fn validate(self) -> Result<String, FormatToInternalMapError> {
-        match self {
-            YamlValue::String(string) => Ok(string),
-            other => Err(FormatToInternalMapError::NonStringKey(
-                serde_yaml::to_string(&other).expect("yaml value not serializable"),
-            )),
-        }
-    }
-
-    fn from_internal(key: String) -> Self {
-        YamlValue::String(key)
-    }
-}
-
 impl FileFormatValueAdapter for YamlValue {
     fn decrypted_to_internal(self) -> Result<RopsTree<DecryptedMap>, FormatToInternalMapError> {
         Ok(match self {
             // SOPS simply throws away tags, so do we for now.
             // It can, however, deserialize manually added tags to encrypted documents,
             // so we could in theory keep the tags somewhere without breaking SOPS compatibility.
-            YamlValue::Tagged(tagged) => tagged.value.decrypted_to_internal()?,
+            YamlValue::Tagged(tagged) => tagged.value().clone().decrypted_to_internal()?,
             YamlValue::Mapping(map) => RopsTree::Map(YamlMap::decrypted_to_internal(map)?),
             YamlValue::Bool(boolean) => RopsTree::Leaf(RopsValue::Boolean(boolean)),
             YamlValue::String(string) => RopsTree::Leaf(RopsValue::String(string)),
@@ -90,7 +94,7 @@ impl FileFormatValueAdapter for YamlValue {
         resolved_partial_encryption: ResolvedPartialEncryption,
     ) -> Result<RopsTree<EncryptedMap<C>>, FormatToInternalMapError> {
         Ok(match self {
-            YamlValue::Tagged(tagged) => tagged.value.encrypted_to_internal(resolved_partial_encryption)?,
+            YamlValue::Tagged(tagged) => tagged.value().clone().encrypted_to_internal(resolved_partial_encryption)?,
             YamlValue::Mapping(map) => RopsTree::Map(map.encrypted_to_internal(resolved_partial_encryption, Self::encrypted_to_internal)?),
             YamlValue::String(string) => match resolved_partial_encryption.escape_encryption() || string.is_empty() {
                 true => RopsTree::Leaf(RopsMapEncryptedLeaf::Escaped(RopsValue::String(string))),
@@ -131,14 +135,14 @@ mod helpers {
     use super::*;
 
     pub fn to_internal_number(number: serde_yaml::Number) -> Result<RopsValue, FormatToInternalMapError> {
-        Ok(match number.is_f64() {
-            true => RopsValue::Float(number.as_f64().expect("number not a f64").into()),
-            false => RopsValue::Integer(
-                number
-                    .as_i64()
-                    .ok_or_else(|| FormatToInternalMapError::IntegerOutOfRange(number.as_u64().expect("number not an u64")))?,
-            ),
-        })
+        // noyalib's `is_f64` is true for every number (integers widen to `f64`).
+        // `is_float` is the type tag serde_yaml 0.9 called `is_f64`.
+        if number.is_float() {
+            return Ok(RopsValue::Float(number.as_f64().into()));
+        }
+        Ok(RopsValue::Integer(number.as_i64().ok_or_else(|| {
+            FormatToInternalMapError::IntegerOutOfRange(number.as_u64().expect("number not an u64"))
+        })?))
     }
 
     pub fn from_internal_value(value: RopsValue) -> YamlValue {

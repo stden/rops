@@ -57,3 +57,38 @@ pub enum Format {
     Json,
     Toml,
 }
+
+#[cfg(test)]
+mod tests {
+    use regex::Regex;
+    use rops::file::metadata::PartialEncryptionConfig;
+
+    use super::*;
+
+    fn assert_round_trip(config: PartialEncryptionConfig, expected: PartialEncryptionConfig) {
+        assert_eq!(expected, PartialEncryptionConfig::from(PartialEncryptionArgs::from(config)));
+    }
+
+    #[test]
+    fn round_trips_every_partial_encryption_variant() {
+        assert_round_trip(
+            PartialEncryptionConfig::EncryptedSuffix("secret".to_string()),
+            PartialEncryptionConfig::EncryptedSuffix("secret".to_string()),
+        );
+        assert_round_trip(
+            PartialEncryptionConfig::UnencryptedSuffix("public".to_string()),
+            PartialEncryptionConfig::UnencryptedSuffix("public".to_string()),
+        );
+
+        let encrypted_regex = Regex::new("secret").unwrap();
+        let unencrypted_regex = Regex::new("public").unwrap();
+        assert_round_trip(
+            PartialEncryptionConfig::EncryptedRegex(encrypted_regex.into()),
+            PartialEncryptionConfig::EncryptedRegex(Regex::new("secret").unwrap().into()),
+        );
+        assert_round_trip(
+            PartialEncryptionConfig::UnencryptedRegex(unencrypted_regex.into()),
+            PartialEncryptionConfig::UnencryptedRegex(Regex::new("public").unwrap().into()),
+        );
+    }
+}

@@ -67,9 +67,7 @@ impl Integration for AwsKmsIntegration {
             .expect("decryption response missing decrypted plaintext")
             .into_inner();
 
-        DataKey::try_from(decrypted_bytes)
-            .map(Some)
-            .map_err(|error| IntegrationError::Decryption(error.into()))
+        data_key_from_plaintext(decrypted_bytes)
     }
 
     fn select_metadata_units(integration_metadata: &mut IntegrationMetadata) -> &mut IntegrationMetadataUnits<Self> {
@@ -90,7 +88,7 @@ fn find_client(key_id: &AwsKeyId) -> IntegrationResult<Option<Client>> {
         return Ok(None);
     };
 
-    let config = Config::builder()
+    let config_builder = Config::builder()
         .region(Some(key_arn.region.clone()))
         .credentials_provider(Credentials::new(
             matching_private_key.id,
@@ -98,10 +96,27 @@ fn find_client(key_id: &AwsKeyId) -> IntegrationResult<Option<Client>> {
             None,
             None,
             "rops",
-        ))
-        .build();
+        ));
 
-    Ok(Some(Client::from_conf(config)))
+    // Rebind only in tests. A `mut` binding is unused, and denied, in the non-test build.
+    #[cfg(test)]
+    let config_builder = match ENDPOINT_OVERRIDE.with(|endpoint| endpoint.get()) {
+        Some(endpoint) => config_builder.endpoint_url(endpoint),
+        None => config_builder,
+    };
+
+    Ok(Some(Client::from_conf(config_builder.build())))
+}
+
+fn data_key_from_plaintext(bytes: Vec<u8>) -> IntegrationResult<Option<DataKey>> {
+    DataKey::try_from(bytes)
+        .map(Some)
+        .map_err(|error| IntegrationError::Decryption(error.into()))
+}
+
+#[cfg(test)]
+thread_local! {
+    static ENDPOINT_OVERRIDE: std::cell::Cell<Option<&'static str>> = const { std::cell::Cell::new(None) };
 }
 
 #[cfg(feature = "test-utils")]
@@ -124,4 +139,59 @@ mod tests {
     use super::*;
 
     generate_integration_test_suite!(AwsKmsIntegration);
+
+    #[test]
+    fn rejects_a_plaintext_with_the_wrong_length() {
+        assert!(data_key_from_plaintext(vec![1, 2, 3]).is_err());
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn find_client_reports_retrieval_profile_and_request_failures() {
+        let key_id = AwsKeyId::mock();
+        let data_key = DataKey::mock();
+        let file_override = AwsKmsIntegration::private_key_file_path_override_env_var_name();
+        let _hidden_file = EnvVarGuard::set(&file_override, "/no/such/aws-keys");
+
+        let _not_unicode = EnvVarGuard::set(
+            AwsKmsIntegration::private_key_env_var_name(),
+            <std::ffi::OsString as std::os::unix::ffi::OsStringExt>::from_vec(vec![0xff]),
+        );
+        assert!(AwsKmsIntegration::encrypt_data_key(&key_id, &data_key).is_err());
+        drop(_not_unicode);
+
+        let _other_profile = EnvVarGuard::set(AwsKmsIntegration::private_key_env_var_name(), "other.AKIATESTKEYID.secretvalue");
+        assert!(AwsKmsIntegration::encrypt_data_key(&key_id, &data_key).is_err());
+        assert!(AwsKmsIntegration::decrypt_data_key(&key_id, "QQ").unwrap().is_none());
+        drop(_other_profile);
+
+        let _matching = EnvVarGuard::set(
+            AwsKmsIntegration::private_key_env_var_name(),
+            AwsKmsIntegration::mock_private_key_str().as_ref(),
+        );
+        ENDPOINT_OVERRIDE.with(|endpoint| endpoint.set(Some("http://127.0.0.1:9")));
+        assert!(AwsKmsIntegration::encrypt_data_key(&key_id, &data_key).is_err());
+        assert!(AwsKmsIntegration::decrypt_data_key(&key_id, AwsKmsIntegration::mock_encrypted_data_key_str()).is_err());
+        ENDPOINT_OVERRIDE.with(|endpoint| endpoint.set(None));
+
+        let _not_unicode = EnvVarGuard::set(
+            AwsKmsIntegration::private_key_env_var_name(),
+            <std::ffi::OsString as std::os::unix::ffi::OsStringExt>::from_vec(vec![0xff]),
+        );
+        assert!(AwsKmsIntegration::decrypt_data_key(&key_id, "YQ==").is_err());
+        assert!(AwsKmsIntegration::parse_key_id("not-a-key-id").is_err());
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn removing_the_age_key_reports_aws_reencryption_failure() {
+        let _env = EnvVarGuard::unset(AwsKmsIntegration::private_key_env_var_name());
+        let _file = EnvVarGuard::set(
+            AwsKmsIntegration::private_key_file_path_override_env_var_name(),
+            "/no/such/aws-keys",
+        );
+        let mut metadata = RopsFileMetadata::<DecryptedMetadata<SHA512>>::mock();
+        let age_key_id = <AgeIntegration as Integration>::KeyId::mock();
+        assert!(metadata.remove_integration_key::<AgeIntegration>(&age_key_id).is_err());
+    }
 }

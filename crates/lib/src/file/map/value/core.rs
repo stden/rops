@@ -120,6 +120,18 @@ mod mock {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn from_bytes_rejects_invalid_payloads() {
+        assert!(RopsValue::from_bytes(vec![0xff], RopsValueVariant::String).is_err());
+        assert!(RopsValue::from_bytes(b"nope".to_vec(), RopsValueVariant::Boolean).is_err());
+        assert!(RopsValue::from_bytes(vec![0xff], RopsValueVariant::Integer).is_err());
+        assert!(RopsValue::from_bytes(b"nope".to_vec(), RopsValueVariant::Integer).is_err());
+        assert!(RopsValue::from_bytes(vec![0xff], RopsValueVariant::Float).is_err());
+        assert!(RopsValue::from_bytes(b"nope".to_vec(), RopsValueVariant::Float).is_err());
+    }
+
     #[cfg(feature = "aes-gcm")]
     mod aes_gcm {
         use crate::*;
@@ -170,6 +182,12 @@ mod tests {
                 RopsValue::Integer(1234),
             );
         }
+        #[test]
+        fn stub_cipher_encrypt_fails() {
+            let error = RopsValue::String("world".to_string()).encrypt::<StubCipher>(Nonce::new(), &DataKey::mock(), &KeyPath::default());
+            assert!(error.is_err());
+        }
+
         #[test]
         fn encrypts_float_value() {
             assert_encrypts_value(

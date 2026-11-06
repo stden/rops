@@ -134,4 +134,36 @@ mod tests {
             pretty_assertions::assert_eq!(RopsMap::mock(), encrypted_map.decrypt(&data_key).unwrap())
         }
     }
+
+    #[cfg(feature = "test-utils")]
+    mod stub {
+        use crate::*;
+
+        fn decrypted(tree: RopsTree<DecryptedMap>) -> RopsMap<DecryptedMap> {
+            RopsMap(indexmap::IndexMap::from([("key".to_string(), tree)]))
+        }
+
+        fn leaf() -> RopsTree<DecryptedMap> {
+            RopsTree::Leaf(RopsValue::String("value".to_string()))
+        }
+
+        #[test]
+        fn stub_cipher_hits_every_encrypt_error_arm() {
+            let data_key = DataKey::mock();
+            assert!(decrypted(leaf()).encrypt::<StubCipher>(&data_key, None).is_err());
+            assert!(decrypted(RopsTree::Sequence(vec![leaf()]))
+                .encrypt::<StubCipher>(&data_key, None)
+                .is_err());
+            assert!(decrypted(RopsTree::Map(decrypted(leaf())))
+                .encrypt::<StubCipher>(&data_key, None)
+                .is_err());
+
+            assert!(decrypted(RopsTree::Null).encrypt::<StubCipher>(&data_key, None).is_ok());
+            assert!(decrypted(RopsTree::Leaf(RopsValue::String(String::new())))
+                .encrypt::<StubCipher>(&data_key, None)
+                .is_ok());
+            let partial = PartialEncryptionConfig::UnencryptedSuffix("zzz".to_string());
+            assert!(decrypted(RopsTree::Null).encrypt::<StubCipher>(&data_key, Some(&partial)).is_ok());
+        }
+    }
 }

@@ -94,3 +94,24 @@ mod sha2 {
         }
     }
 }
+
+#[cfg(all(feature = "test-utils", feature = "sha2"))]
+mod stub {
+    use std::marker::PhantomData;
+
+    use crate::*;
+
+    #[test]
+    fn stub_cipher_cannot_encrypt_or_decrypt_a_mac() {
+        assert!(Mac::<SHA512>::mock()
+            .encrypt::<StubCipher>(&DataKey::mock(), &LastModifiedDateTime::mock())
+            .is_err());
+
+        let encrypted = EncryptedMac::<StubCipher, SHA512>(EncryptedRopsValue::<StubCipher>::mock(), PhantomData);
+        assert!(encrypted.decrypt(&DataKey::mock(), &LastModifiedDateTime::mock()).is_err());
+        let encrypted = EncryptedMac::<StubCipher, SHA512>(EncryptedRopsValue::<StubCipher>::mock(), PhantomData);
+        assert!(encrypted
+            .decrypt_and_save_nonce(&DataKey::mock(), &LastModifiedDateTime::mock())
+            .is_err());
+    }
+}

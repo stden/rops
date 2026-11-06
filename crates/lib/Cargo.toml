@@ -22,7 +22,7 @@ default = ["age", "aws-kms", "yaml", "json", "toml", "aes-gcm", "sha2"]
 age = ["dep:age"]
 aws-kms = ["dep:aws-arn", "dep:aws-sdk-kms", "dep:tokio"]
 # File formats:
-yaml = ["dep:serde_yaml"]
+yaml = ["dep:serde_yaml", "dep:noyalib"]
 json = ["dep:serde_json"]
 toml = ["dep:toml"]
 # Ciphers
@@ -57,9 +57,11 @@ age = { workspace = true, features = ["armor"], optional = true }
 # AWS_KMS
 aws-arn = { workspace = true, optional = true }
 aws-sdk-kms = { workspace = true, optional = true }
-tokio = { workspace = true, features = ["full"], optional = true }
+# Runtime::new needs the multi-thread scheduler. `full` also compiles process, signal, and fs.
+tokio = { workspace = true, features = ["rt-multi-thread"], optional = true }
 
 # YAML
+noyalib = { workspace = true, optional = true }
 serde_yaml = { workspace = true, optional = true }
 
 # JSON
@@ -83,6 +85,7 @@ indoc = { workspace = true, optional = true }
 criterion.workspace = true
 serial_test.workspace = true
 tempfile.workspace = true
+walkdir.workspace = true
 
 [[bench]]
 name = "encrypt_decrypt"
@@ -95,6 +98,7 @@ workspace = true
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+noyalib.workspace = true
 serde_yaml.workspace = true
 walkdir.workspace = true
 

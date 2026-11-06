@@ -114,4 +114,28 @@ mod test {
         encrypted_args.merge_config(Config::mock_other());
         assert!(encrypted_args.mac_only_encrypted.is_some());
     }
+
+    #[test]
+    fn keeps_explicit_partial_encryption_and_mac() {
+        let mut encrypted_args = EncryptArgs::mock();
+        encrypted_args.partial_encryption_args = Some(PartialEncryptionConfig::EncryptedSuffix("keep".to_string()).into());
+        encrypted_args.mac_only_encrypted = Some(false);
+        encrypted_args.merge_config(Config::mock());
+        assert_eq!(
+            PartialEncryptionConfig::EncryptedSuffix("keep".to_string()),
+            encrypted_args.partial_encryption_args.unwrap().into()
+        );
+        assert_eq!(Some(false), encrypted_args.mac_only_encrypted);
+    }
+
+    #[test]
+    fn ignores_creation_rules_that_do_not_match_the_path() {
+        let mut encrypted_args = EncryptArgs::mock();
+        let age_keys = encrypted_args.integration_keys.age.len();
+        let mut config = Config::mock_other();
+        config.creation_rules[0].path_regex = Regex::new("does-not-match-this-path").unwrap();
+        encrypted_args.merge_config(config);
+        assert_eq!(age_keys, encrypted_args.integration_keys.age.len());
+        assert!(encrypted_args.partial_encryption_args.is_none());
+    }
 }

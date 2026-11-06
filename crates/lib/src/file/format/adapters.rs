@@ -101,3 +101,162 @@ where
         format_map
     }
 }
+
+#[cfg(all(test, feature = "test-utils"))]
+mod tests {
+    use std::{
+        cell::Cell,
+        hash::{Hash, Hasher},
+    };
+
+    use indexmap::IndexMap;
+    use serde::{Deserialize, Serialize};
+
+    use super::{FileFormatKeyAdapter, FileFormatMapAdapter, FileFormatValueAdapter};
+    use crate::*;
+
+    #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+    struct BadKey;
+
+    impl Hash for BadKey {
+        fn hash<H: Hasher>(&self, _state: &mut H) {}
+    }
+
+    thread_local! {
+        static KEY_IS_VALID: Cell<bool> = const { Cell::new(false) };
+        static VALUE_FN_FAILS: Cell<bool> = const { Cell::new(false) };
+        static DECRYPTED_VALUE_FAILS: Cell<bool> = const { Cell::new(false) };
+    }
+
+    impl FileFormatKeyAdapter for BadKey {
+        fn validate(self) -> Result<String, FormatToInternalMapError> {
+            if KEY_IS_VALID.with(|flag| flag.get()) {
+                return Ok("key".to_string());
+            }
+            Err(FormatToInternalMapError::NonStringKey("bad".to_string()))
+        }
+
+        fn from_internal(_key: String) -> Self {
+            BadKey
+        }
+    }
+
+    #[derive(Debug, PartialEq, Serialize, Deserialize)]
+    struct BadValue;
+
+    impl FileFormatValueAdapter for BadValue {
+        fn decrypted_to_internal(self) -> Result<RopsTree<DecryptedMap>, FormatToInternalMapError> {
+            if DECRYPTED_VALUE_FAILS.with(|flag| flag.get()) {
+                return Err(FormatToInternalMapError::NonStringKey("value".to_string()));
+            }
+            Ok(RopsTree::Null)
+        }
+
+        fn decrypted_from_internal(_tree: RopsTree<DecryptedMap>) -> Self {
+            BadValue
+        }
+
+        fn encrypted_to_internal<C: Cipher>(
+            self,
+            _resolved_partial_encryption: ResolvedPartialEncryption,
+        ) -> Result<RopsTree<EncryptedMap<C>>, FormatToInternalMapError> {
+            Ok(RopsTree::Null)
+        }
+
+        fn encrypted_from_internal<C: Cipher>(_tree: RopsTree<EncryptedMap<C>>) -> Self {
+            BadValue
+        }
+    }
+
+    #[derive(Debug, PartialEq, Serialize, Deserialize)]
+    struct BadMap(IndexMap<BadKey, BadValue>);
+
+    impl IntoIterator for BadMap {
+        type Item = (BadKey, BadValue);
+        type IntoIter = indexmap::map::IntoIter<BadKey, BadValue>;
+
+        fn into_iter(self) -> Self::IntoIter {
+            self.0.into_iter()
+        }
+    }
+
+    impl FileFormatMapAdapter for BadMap {
+        type Key = BadKey;
+        type Value = BadValue;
+
+        fn with_capacity(capacity: usize) -> Self {
+            Self(IndexMap::with_capacity(capacity))
+        }
+
+        fn insert(&mut self, key: Self::Key, value: Self::Value) {
+            self.0.insert(key, value);
+        }
+    }
+
+    fn convert_value<C: Cipher>(
+        value: BadValue,
+        resolved: ResolvedPartialEncryption,
+    ) -> Result<RopsTree<EncryptedMap<C>>, FormatToInternalMapError> {
+        if VALUE_FN_FAILS.with(|flag| flag.get()) {
+            return Err(FormatToInternalMapError::NonStringKey("value".to_string()));
+        }
+        value.encrypted_to_internal(resolved)
+    }
+
+    #[test]
+    fn non_string_keys_fail_both_conversions() {
+        assert!(convert_value::<AES256GCM>(BadValue, None.into()).is_ok());
+
+        let mut decrypted = BadMap::with_capacity(1);
+        decrypted.insert(BadKey, BadValue);
+        assert!(decrypted.decrypted_to_internal().is_err());
+
+        let mut encrypted = BadMap::with_capacity(1);
+        encrypted.insert(BadKey, BadValue);
+        assert!(encrypted.encrypted_to_internal(None.into(), convert_value::<AES256GCM>).is_err());
+
+        let _ = BadKey::from_internal("key".to_string());
+        assert!(matches!(BadValue.decrypted_to_internal().unwrap(), RopsTree::Null));
+        let _ = BadValue::decrypted_from_internal(RopsTree::Null);
+        let _ = BadValue::encrypted_from_internal::<AES256GCM>(RopsTree::Null);
+    }
+
+    #[test]
+    fn valid_keys_cover_both_conversion_tails() {
+        KEY_IS_VALID.with(|flag| flag.set(true));
+
+        let mut decrypted = BadMap::with_capacity(1);
+        decrypted.insert(BadKey, BadValue);
+        assert!(decrypted.decrypted_to_internal().is_ok());
+        assert!(BadMap::with_capacity(0).decrypted_to_internal().is_ok());
+
+        DECRYPTED_VALUE_FAILS.with(|flag| flag.set(true));
+        let mut decrypted = BadMap::with_capacity(1);
+        decrypted.insert(BadKey, BadValue);
+        assert!(decrypted.decrypted_to_internal().is_err());
+        DECRYPTED_VALUE_FAILS.with(|flag| flag.set(false));
+
+        let mut encrypted = BadMap::with_capacity(1);
+        encrypted.insert(BadKey, BadValue);
+        assert!(encrypted.encrypted_to_internal(None.into(), convert_value::<AES256GCM>).is_ok());
+
+        let config = PartialEncryptionConfig::UnencryptedSuffix("zzz".to_string());
+        let mut encrypted = BadMap::with_capacity(1);
+        encrypted.insert(BadKey, BadValue);
+        assert!(encrypted
+            .encrypted_to_internal(ResolvedPartialEncryption::No(&config), convert_value::<AES256GCM>)
+            .is_ok());
+
+        assert!(BadMap::with_capacity(0)
+            .encrypted_to_internal(None.into(), convert_value::<AES256GCM>)
+            .is_ok());
+
+        VALUE_FN_FAILS.with(|flag| flag.set(true));
+        let mut encrypted = BadMap::with_capacity(1);
+        encrypted.insert(BadKey, BadValue);
+        assert!(encrypted.encrypted_to_internal(None.into(), convert_value::<AES256GCM>).is_err());
+
+        KEY_IS_VALID.with(|flag| flag.set(false));
+        VALUE_FN_FAILS.with(|flag| flag.set(false));
+    }
+}

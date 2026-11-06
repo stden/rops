@@ -75,6 +75,20 @@ mod regex {
             self.0.as_str() == other.0.as_str()
         }
     }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn regex_equality_compares_patterns() {
+            let pattern = RopsRegex::from(Regex::new("a+").unwrap());
+            let same = RopsRegex::from(Regex::new("a+").unwrap());
+            let other = RopsRegex::from(Regex::new("b+").unwrap());
+            assert_eq!(pattern, same);
+            assert_ne!(pattern, other);
+        }
+    }
 }
 
 #[cfg(feature = "test-utils")]

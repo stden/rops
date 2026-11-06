@@ -84,4 +84,31 @@ mod tests {
 
         assert!(!integration_metadata.age.is_empty())
     }
+
+    #[test]
+    fn decrypts_nothing_without_integration_units() {
+        assert!(IntegrationMetadata::default().decrypt_data_key().unwrap().is_none());
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn age_and_aws_decryption_errors_propagate() {
+        let _age = EnvVarGuard::set(
+            AgeIntegration::private_key_env_var_name(),
+            AgeIntegration::mock_private_key_str().as_ref(),
+        );
+        let _age_file = EnvVarGuard::set(AgeIntegration::private_key_file_path_override_env_var_name(), "/no/such/age-keys");
+
+        let mut age_metadata = IntegrationMetadata::default();
+        let mut age_unit = IntegrationMetadataUnit::<AgeIntegration>::mock();
+        age_unit.encrypted_data_key = "not armor".to_string();
+        age_metadata.age.insert(age_unit);
+        assert!(age_metadata.decrypt_data_key().is_err());
+
+        let mut aws_metadata = IntegrationMetadata::default();
+        let mut aws_unit = IntegrationMetadataUnit::<AwsKmsIntegration>::mock();
+        aws_unit.encrypted_data_key = "%%%".to_string();
+        aws_metadata.kms.insert(aws_unit);
+        assert!(aws_metadata.decrypt_data_key().is_err());
+    }
 }

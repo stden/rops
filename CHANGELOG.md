@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Workspace Rust and Clippy lints, so `cargo clippy` enforces the same warning denial as CI.
 - Criterion benchmarks for YAML encrypt and decrypt (`cargo bench -p rops`).
 
+### Changed
+
+- YAML parsing now uses `noyalib-serde-yaml` under the `serde_yaml` name, which removes the unmaintained `unsafe-libyaml` dependency (RUSTSEC-2024-0449).
+
 ## [0.1.7] - 2026-02-14
 
 ### Fixed

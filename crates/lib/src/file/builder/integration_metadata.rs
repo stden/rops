@@ -67,4 +67,18 @@ mod tests {
             IntegrationMetadataBuilderError::MissingKeys
         ))
     }
+
+    #[test]
+    #[cfg(feature = "aws-kms")]
+    #[serial_test::serial]
+    fn aws_keys_skip_the_missing_key_check_and_still_fail_closed() {
+        let _env = EnvVarGuard::unset(AwsKmsIntegration::private_key_env_var_name());
+        let _file = EnvVarGuard::set(
+            AwsKmsIntegration::private_key_file_path_override_env_var_name(),
+            "/no/such/aws-keys",
+        );
+        let mut builder = IntegrationMetadataBuilder::default();
+        builder.aws_kms_key_ids.push(AwsKeyId::mock());
+        assert!(builder.into_integration_metadata(&DataKey::mock()).is_err());
+    }
 }

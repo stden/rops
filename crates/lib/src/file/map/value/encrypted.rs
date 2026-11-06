@@ -79,7 +79,8 @@ impl<C: Cipher> FromStr for EncryptedRopsValue<C> {
             .ok_or(Missing("closing (']') bracket"))?
             .split(',');
 
-        let cipher_variant_str = encrypted_value_components.next().ok_or(Missing("cipher"))?;
+        // `split` always yields at least one component, so a missing cipher is `InvalidCipher`.
+        let cipher_variant_str = encrypted_value_components.next().expect("split yields at least one component");
 
         if cipher_variant_str != C::NAME {
             return Err(InvalidCipher(cipher_variant_str.to_string(), C::NAME));
@@ -176,6 +177,29 @@ mod tests {
         #[test]
         fn parses_value() {
             FromStrTestUtils::assert_parse::<EncryptedRopsValue<AES256GCM>>()
+        }
+
+        #[test]
+        fn rejects_malformed_enc_strings() {
+            let cases = [
+                "nope",
+                "ENC",
+                "ENC[AES256_GCM",
+                "ENC[AES256_GCM]",
+                "ENC[AES256_GCM,data:%%%]",
+                "ENC[AES256_GCM,data:QQ,iv:%%%]",
+                "ENC[AES256_GCM,data:QQ,iv:QQ,tag:%%%]",
+                "ENC[AES256_GCM,data:QQ,iv:QQ,tag:QQ,type:nope]",
+            ];
+            for case in cases {
+                assert!(case.parse::<EncryptedRopsValue<AES256GCM>>().is_err(), "{case}");
+            }
+        }
+
+        #[test]
+        fn stub_decrypt_fails() {
+            let error = EncryptedRopsValue::<StubCipher>::mock().decrypt(&DataKey::mock(), &KeyPath::default());
+            assert!(error.is_err());
         }
 
         #[test]

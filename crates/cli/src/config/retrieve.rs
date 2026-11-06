@@ -124,4 +124,23 @@ mod tests {
     fn retrieves_config_by_default_fallback() {
         assert_eq!(StubConfig::default(), retrieve_impl(None).unwrap());
     }
+
+    #[test]
+    #[serial_test::serial(config_retrieval)]
+    fn reports_a_missing_current_directory() {
+        let original = std::env::current_dir().unwrap();
+        let directory = std::env::temp_dir().join(format!("rops-cwd-{}", std::process::id()));
+        std::fs::create_dir(&directory).unwrap();
+        std::env::set_current_dir(&directory).unwrap();
+        std::fs::remove_dir(&directory).unwrap();
+        let result = retrieve_impl::<StubConfig>(None);
+        std::env::set_current_dir(original).unwrap();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn reports_an_unreadable_config_path() {
+        let directory = tempfile::tempdir().unwrap();
+        assert!(retrieve_impl::<StubConfig>(Some(directory.path())).is_err());
+    }
 }

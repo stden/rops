@@ -76,4 +76,17 @@ mod tests {
     fn displays_key_id() {
         DisplayTestUtils::assert_display::<AwsKeyId>()
     }
+
+    #[test]
+    fn rejects_malformed_key_ids() {
+        assert!("not-an-arn".parse::<AwsKeyId>().is_err());
+        assert!("profile.not-an-arn".parse::<AwsKeyId>().is_err());
+    }
+
+    #[test]
+    fn appends_itself_to_a_metadata_builder() {
+        let mut builder = IntegrationMetadataBuilder::default();
+        AwsKeyId::mock().append_to_metadata_builder(&mut builder);
+        assert_eq!(builder.aws_kms_key_ids, vec![AwsKeyId::mock()]);
+    }
 }

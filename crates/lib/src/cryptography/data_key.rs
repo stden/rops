@@ -52,6 +52,16 @@ impl TryFrom<Vec<u8>> for DataKey {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_the_wrong_number_of_bytes() {
+        assert!(DataKey::try_from(vec![1, 2, 3]).is_err());
+    }
+}
+
 #[cfg(feature = "test-utils")]
 mod mock {
     use hybrid_array::Array;

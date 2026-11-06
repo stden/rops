@@ -90,6 +90,31 @@ mod tests {
         }
 
         #[test]
+        fn child_failures_fail_sequences_and_nested_maps() {
+            fn bad_leaf() -> RopsTree<EncryptedMap<AES256GCM>> {
+                RopsTree::Leaf(RopsMapEncryptedLeaf::Encrypted(EncryptedRopsValue {
+                    data: EncryptedData::mock(),
+                    authorization_tag: "AAAAAAAAAAAAAAAAAAAAAA".parse().unwrap(),
+                    nonce: Nonce::mock(),
+                    value_variant: RopsValueVariant::String,
+                }))
+            }
+
+            let data_key = DataKey::mock();
+            let sequence = RopsMap(indexmap::IndexMap::from([(
+                "items".to_string(),
+                RopsTree::Sequence(vec![bad_leaf()]),
+            )]));
+            assert!(sequence.decrypt(&data_key).is_err());
+
+            let nested = RopsMap(indexmap::IndexMap::from([(
+                "outer".to_string(),
+                RopsTree::Map(RopsMap(indexmap::IndexMap::from([("inner".to_string(), bad_leaf())]))),
+            )]));
+            assert!(nested.decrypt(&data_key).is_err());
+        }
+
+        #[test]
         fn decryption_can_save_nonces() {
             assert_eq!(
                 (RopsMap::<DecryptedMap>::mock(), SavedRopsMapNonces::mock()),
@@ -97,6 +122,34 @@ mod tests {
                     .decrypt_and_save_nonces(&DataKey::mock())
                     .unwrap()
             )
+        }
+    }
+
+    #[cfg(feature = "test-utils")]
+    mod stub {
+        use crate::*;
+
+        fn encrypted_leaf() -> RopsTree<EncryptedMap<StubCipher>> {
+            RopsTree::Leaf(RopsMapEncryptedLeaf::Encrypted(EncryptedRopsValue::<StubCipher>::mock()))
+        }
+
+        fn encrypted(tree: RopsTree<EncryptedMap<StubCipher>>) -> RopsMap<EncryptedMap<StubCipher>> {
+            RopsMap(indexmap::IndexMap::from([("key".to_string(), tree)]))
+        }
+
+        #[test]
+        fn stub_cipher_hits_every_decrypt_error_arm() {
+            let data_key = DataKey::mock();
+            assert!(encrypted(encrypted_leaf()).decrypt(&data_key).is_err());
+            assert!(encrypted(encrypted_leaf()).decrypt_and_save_nonces(&data_key).is_err());
+            assert!(encrypted(RopsTree::Sequence(vec![encrypted_leaf()])).decrypt(&data_key).is_err());
+            assert!(encrypted(RopsTree::Sequence(vec![encrypted_leaf()]))
+                .decrypt_and_save_nonces(&data_key)
+                .is_err());
+            assert!(encrypted(RopsTree::Map(encrypted(encrypted_leaf()))).decrypt(&data_key).is_err());
+            assert!(encrypted(RopsTree::Map(encrypted(encrypted_leaf())))
+                .decrypt_and_save_nonces(&data_key)
+                .is_err());
         }
     }
 }

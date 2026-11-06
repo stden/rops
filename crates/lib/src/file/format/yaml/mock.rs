@@ -76,6 +76,8 @@ mod metadata {
         where
             I::Config: MockFileFormatUtil<YamlFileFormat>,
         {
+            // One integration const and one ciphertext shape are dead in every monomorphization.
+            #[cfg_attr(coverage_nightly, coverage(off))]
             fn mock_format_display() -> String {
                 let config = I::Config::mock_format_display();
                 let encrypted_data_key_str = I::mock_encrypted_data_key_str();

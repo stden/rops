@@ -140,4 +140,40 @@ mod tests {
     fn displays_key_arn() {
         DisplayTestUtils::assert_display::<AwsKeyResourceName>()
     }
+
+    #[test]
+    fn rejects_text_that_is_not_an_arn() {
+        assert!("not-an-arn".parse::<AwsKeyResourceName>().is_err());
+    }
+
+    #[test]
+    fn rejects_an_arn_without_a_region() {
+        let arn = aws_arn::ResourceName {
+            partition: Some("aws".parse().unwrap()),
+            service: "kms".parse().unwrap(),
+            region: None,
+            account_id: Some("822284028627".parse().unwrap()),
+            resource: "key/abc".parse().unwrap(),
+        };
+        assert!(AwsKeyResourceName::try_from(arn).is_err());
+    }
+
+    #[test]
+    fn accepts_a_resource_without_a_parent_path() {
+        let parsed = "arn:aws:kms:eu-north-1:822284028627:barekey".parse::<AwsKeyResourceName>().unwrap();
+        assert!(parsed.optional_key_id_parent_path.is_none());
+    }
+
+    #[test]
+    fn displays_an_arn_without_optional_identifiers() {
+        let name = AwsKeyResourceName {
+            optional_partition: None,
+            service: "kms".parse().unwrap(),
+            region: Region::from_static("eu-north-1"),
+            optional_account_id: None,
+            optional_key_id_parent_path: None,
+            key_id: "abc".parse().unwrap(),
+        };
+        assert_eq!("arn:kms:eu-north-1:abc", name.to_string());
+    }
 }

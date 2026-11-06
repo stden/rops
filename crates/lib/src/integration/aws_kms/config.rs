@@ -32,3 +32,14 @@ mod mock {
         }
     }
 }
+
+#[cfg(all(test, feature = "test-utils"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stores_its_key_id() {
+        let config = AwsKmsConfig::new(AwsKeyId::mock());
+        assert_eq!(config.key_id(), &AwsKeyId::mock());
+    }
+}

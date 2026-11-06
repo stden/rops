@@ -21,6 +21,8 @@ impl FromStr for AwsPrivateKey {
         const SECRET_COMPONENT: &str = "aws_secret_access_key";
 
         let mut key_components = str.split('.');
+        // `split` always yields a first component, including the empty string.
+        let profile = key_components.next().expect("split yields at least one component").to_string();
 
         let mut next_component = |component_name: &str| -> IntegrationResult<String> {
             key_components
@@ -39,7 +41,7 @@ impl FromStr for AwsPrivateKey {
         // IMPROVEMENT: assert length of iterator is 3.
 
         Ok(Self {
-            profile: next_component(PROFILE_COMPONENT)?,
+            profile,
             id: next_component(ID_COMPONENT)?,
             secret: next_component(SECRET_COMPONENT)?,
         })
@@ -82,5 +84,11 @@ mod tests {
     #[test]
     fn displays_private_key() {
         DisplayTestUtils::assert_display::<AwsPrivateKey>()
+    }
+
+    #[test]
+    fn rejects_private_keys_with_too_few_components() {
+        assert!("onlyprofile".parse::<AwsPrivateKey>().is_err());
+        assert!("profile.access-key".parse::<AwsPrivateKey>().is_err());
     }
 }

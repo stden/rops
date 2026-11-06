@@ -19,10 +19,10 @@ anyhow = "1"
 aws-arn = "0.3"
 aws-sdk-kms = { version = "1.129", features = ["behavior-version-latest"] }
 base64 = "0.23"
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { version = "0.4", default-features = false, features = ["std", "now", "serde"] }
 clap = { version = "4", features = ["derive"] }
 console = "0.16"
-criterion = "0.8"
+criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
 ctrlc = "3"
 derive_more = { version = "2.1", features = ["display", "from", "deref", "deref_mut", "into", "as_ref"] }
 directories = "6"
@@ -37,7 +37,10 @@ regex = "1"
 serde = { version = "1", features = ["derive"] }
 serde_regex = "1"
 serde_with = "3"
-serde_yaml = "0.9"
+# Exact pin: `noyalib-serde-yaml` 0.0.58 depends on `noyalib` `=0.0.58`.
+# Default features stay off so number formatting matches that crate.
+noyalib = { version = "=0.0.58", default-features = false, features = ["std", "compat-serde-yaml"] }
+serde_yaml = { package = "noyalib-serde-yaml", version = "=0.0.58" }
 serde_json = "1"
 serial_test = { version = "4", default-features = false }
 sha2 = "0.11"
@@ -58,3 +61,10 @@ warnings = "deny"
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }
+
+# External crates do not need debuginfo. Workspace members keep the full dev/test setting.
+[profile.dev.package."*"]
+debug = false
+
+[profile.test.package."*"]
+debug = false

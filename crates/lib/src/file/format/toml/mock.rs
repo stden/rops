@@ -127,6 +127,8 @@ mod metadata {
         where
             I::Config: MockFileFormatUtil<TomlFileFormat>,
         {
+            // One integration const and one ciphertext shape are dead in every monomorphization.
+            #[cfg_attr(coverage_nightly, coverage(off))]
             fn mock_format_display() -> String {
                 let mut config = I::Config::mock_format_display();
                 config.pop();

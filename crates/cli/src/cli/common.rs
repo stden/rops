@@ -71,6 +71,8 @@ impl Cli {
 
 #[cfg(test)]
 mod tests {
+    use std::io::IsTerminal;
+
     use super::*;
 
     #[test]
@@ -97,5 +99,84 @@ mod tests {
             Cli::get_format(Some(Path::new("test")), None).unwrap_err(),
             RopsCliError::UndeterminedFormat(UndeterminedFormatError::NoFileExtension(_))
         ))
+    }
+
+    #[test]
+    fn honors_an_explicit_format() {
+        assert_eq!(Format::Json, Cli::get_format(None, Some(Format::Json)).unwrap());
+        assert_eq!(Format::Toml, Cli::get_format(None, Some(Format::Toml)).unwrap());
+    }
+
+    #[test]
+    fn in_place_write_errors_are_reported() {
+        assert!(Cli::write_or_print(Some(true), Some(Path::new("/dev/full")), "rops").is_err());
+    }
+
+    #[test]
+    fn rejects_an_unknown_extension() {
+        assert!(matches!(
+            Cli::get_format(Some(Path::new("file.txt")), None).unwrap_err(),
+            RopsCliError::UndeterminedFormat(UndeterminedFormatError::NoFileExtension(_))
+        ))
+    }
+
+    #[test]
+    fn prints_when_not_in_place() {
+        assert!(Cli::write_or_print(None, None, "rops").is_ok());
+        assert!(Cli::write_or_print(Some(false), None, "rops").is_ok());
+    }
+
+    #[test]
+    #[serial_test::serial(config_retrieval)]
+    fn stdin_read_errors_are_reported() {
+        let directory = std::fs::File::open("/").unwrap();
+        let _saved = super::super::test_fd::SavedFd::redirect_to(0, &directory);
+        assert!(Cli::get_input_string(None, None).is_err());
+    }
+
+    #[test]
+    #[serial_test::serial(config_retrieval)]
+    fn reads_piped_stdin() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), "piped").unwrap();
+        let input = std::fs::File::open(file.path()).unwrap();
+        let _saved = super::super::test_fd::SavedFd::redirect_to(0, &input);
+        assert_eq!("piped", Cli::get_input_string(None, None).unwrap());
+    }
+
+    #[test]
+    #[serial_test::serial(config_retrieval)]
+    fn file_and_piped_stdin_are_multiple_inputs() {
+        let devnull = std::fs::File::open("/dev/null").unwrap();
+        let _saved = super::super::test_fd::SavedFd::redirect_to(0, &devnull);
+        let error = Cli::get_input_string(Some(Path::new("anything")), None).unwrap_err();
+        assert_eq!(Some(&RopsCliError::MultipleInputs), error.downcast_ref());
+    }
+
+    #[test]
+    #[serial_test::serial(config_retrieval)]
+    fn missing_input_on_a_terminal() {
+        assert!(std::io::stdin().is_terminal(), "run file-input tests under script");
+        let error = Cli::get_input_string(None, None).unwrap_err();
+        assert_eq!(Some(&RopsCliError::MissingInput), error.downcast_ref());
+    }
+
+    #[test]
+    #[serial_test::serial(config_retrieval)]
+    fn reads_a_file_from_both_in_place_arms() {
+        assert!(std::io::stdin().is_terminal(), "run file-input tests under script");
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), "inplace").unwrap();
+        assert_eq!("inplace", Cli::get_input_string(Some(file.path()), Some(true)).unwrap());
+        assert_eq!("inplace", Cli::get_input_string(Some(file.path()), None).unwrap());
+        assert_eq!("inplace", Cli::get_input_string(Some(file.path()), Some(false)).unwrap());
+    }
+
+    #[test]
+    #[serial_test::serial(config_retrieval)]
+    fn in_place_read_errors_are_reported() {
+        assert!(std::io::stdin().is_terminal(), "run file-input tests under script");
+        let error = Cli::get_input_string(Some(Path::new("/no/such/rops-input")), Some(true)).unwrap_err();
+        assert!(error.downcast_ref::<std::io::Error>().is_some());
     }
 }

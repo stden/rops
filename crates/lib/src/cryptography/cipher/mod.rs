@@ -10,3 +10,5 @@ pub use aes256_gcm::AES256GCM;
 mod stub_cipher;
 #[cfg(feature = "test-utils")]
 pub(crate) use stub_cipher::StubCipher;
+#[cfg(all(test, feature = "test-utils"))]
+pub(crate) use stub_cipher::StubEncryptSuccess;

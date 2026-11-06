@@ -17,7 +17,7 @@ mod toml;
 pub use toml::TomlFileFormat;
 
 mod adapters;
-pub(crate) use adapters::{FileFormatKeyAdapter, FileFormatMapAdapter, FileFormatValueAdapter};
+pub(crate) use adapters::{FileFormatMapAdapter, FileFormatValueAdapter};
 
 mod map;
 pub(crate) use map::FormatToInternalMapError;

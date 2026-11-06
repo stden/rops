@@ -295,4 +295,113 @@ mod tests {
             .unwrap();
         assert_eq!(LastModifiedDateTime::mock(), rops_file.metadata.last_modified);
     }
+
+    fn overflow_map<S: RopsMapState>() -> RopsFileFormatMap<S, YamlFileFormat> {
+        let inner = YamlFileFormat::deserialize_from_str("n: 18446744073709551615\n").unwrap();
+        RopsFileFormatMap::from_inner_map(inner)
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn reports_parse_encrypt_and_decrypt_failures() {
+        let _age = EnvVarGuard::set(
+            AgeIntegration::private_key_env_var_name(),
+            AgeIntegration::mock_private_key_str().as_ref(),
+        );
+        let _age_file = EnvVarGuard::set(AgeIntegration::private_key_file_path_override_env_var_name(), "/no/such/age-keys");
+
+        assert!("not a rops file".parse::<DecryptedRopsFile>().is_err());
+        assert!(DecryptedRopsFile::mock().set_map(overflow_map()).is_err());
+
+        let mut decrypted = DecryptedRopsFile::mock();
+        decrypted.map = overflow_map();
+        assert!(decrypted.encrypt::<AES256GCM, YamlFileFormat>().is_err());
+
+        let mut decrypted = DecryptedRopsFile::mock();
+        decrypted.map = overflow_map();
+        assert!(decrypted
+            .encrypt_with_saved_parameters::<AES256GCM, YamlFileFormat>(SavedParameters::mock())
+            .is_err());
+
+        let mut decrypted = DecryptedRopsFile::mock();
+        decrypted.metadata.intregation.age.clear();
+        decrypted.metadata.intregation.kms.clear();
+        assert!(decrypted
+            .add_keys::<AgeIntegration>([<AgeIntegration as Integration>::KeyId::mock()])
+            .is_err());
+
+        let mut encrypted = EncryptedRopsFile::mock();
+        encrypted.metadata.intregation.age.clear();
+        encrypted.metadata.intregation.kms.clear();
+        assert!(encrypted.decrypt::<YamlFileFormat>().is_err());
+
+        let mut encrypted = EncryptedRopsFile::mock();
+        encrypted.metadata.intregation.age.clear();
+        encrypted.metadata.intregation.kms.clear();
+        assert!(encrypted.decrypt_and_save_parameters::<YamlFileFormat>().is_err());
+
+        let plaintext = YamlFileFormat::deserialize_from_str("flag: true\n").unwrap();
+        let mut encrypted = EncryptedRopsFile::mock();
+        encrypted.map = RopsFileFormatMap::from_inner_map(plaintext);
+        assert!(encrypted.decrypt::<YamlFileFormat>().is_err());
+
+        let plaintext = YamlFileFormat::deserialize_from_str("flag: true\n").unwrap();
+        let mut encrypted = EncryptedRopsFile::mock();
+        encrypted.map = RopsFileFormatMap::from_inner_map(plaintext);
+        assert!(encrypted.decrypt_and_save_parameters::<YamlFileFormat>().is_err());
+
+        let bad_value = EncryptedRopsValue {
+            data: EncryptedData::mock(),
+            authorization_tag: "AAAAAAAAAAAAAAAAAAAAAA".parse().unwrap(),
+            nonce: Nonce::mock(),
+            value_variant: RopsValueVariant::String,
+        };
+        let bad_map = RopsMap(indexmap::IndexMap::from([(
+            "hello".to_string(),
+            RopsTree::Leaf(RopsMapEncryptedLeaf::Encrypted(bad_value)),
+        )]));
+        let mut encrypted = EncryptedRopsFile::mock();
+        encrypted.map = bad_map.to_external();
+        assert!(encrypted.decrypt::<YamlFileFormat>().is_err());
+
+        let bad_value = EncryptedRopsValue {
+            data: EncryptedData::mock(),
+            authorization_tag: "AAAAAAAAAAAAAAAAAAAAAA".parse().unwrap(),
+            nonce: Nonce::mock(),
+            value_variant: RopsValueVariant::String,
+        };
+        let bad_map = RopsMap(indexmap::IndexMap::from([(
+            "hello".to_string(),
+            RopsTree::Leaf(RopsMapEncryptedLeaf::Encrypted(bad_value)),
+        )]));
+        let mut encrypted = EncryptedRopsFile::mock();
+        encrypted.map = bad_map.to_external();
+        assert!(encrypted.decrypt_and_save_parameters::<YamlFileFormat>().is_err());
+
+        let mismatched = EncryptedRopsFile {
+            map: RopsFileFormatMap::mock_other(),
+            metadata: RopsFileMetadata::mock(),
+        };
+        assert!(mismatched.decrypt_and_save_parameters::<YamlFileFormat>().is_err());
+
+        let mut missing_key = DecryptedRopsFile::mock();
+        missing_key.metadata.intregation.age.clear();
+        missing_key.metadata.intregation.kms.clear();
+        assert!(missing_key.encrypt::<AES256GCM, YamlFileFormat>().is_err());
+
+        let failure = RopsValue::String("value".to_string())
+            .encrypt::<StubCipher>(Nonce::new(), &DataKey::mock(), &KeyPath::default())
+            .unwrap_err();
+        type StubFile = RopsFile<EncryptedFile<StubCipher, SHA512>, YamlFileFormat>;
+        assert!(StubFile::from_parts_results(Err(failure), Err(failure)).is_err());
+        assert!(StubFile::from_parts_results(Ok(RopsMap(indexmap::IndexMap::new())), Err(failure)).is_err());
+
+        let encrypted_metadata = {
+            let _guard = StubEncryptSuccess::arm();
+            RopsFileMetadata::<DecryptedMetadata<SHA512>>::mock()
+                .encrypt::<StubCipher>(&DataKey::mock())
+                .unwrap()
+        };
+        assert!(StubFile::from_parts_results(Ok(RopsMap(indexmap::IndexMap::new())), Ok(encrypted_metadata)).is_ok());
+    }
 }

@@ -278,5 +278,62 @@ mod tests {
 
             assert_ne!(DataKey::mock(), metadata.retrieve_data_key().unwrap());
         }
+
+        #[test]
+        fn removing_an_unknown_key_leaves_metadata_unchanged() {
+            let mut metadata = RopsFileMetadata::<DecryptedMetadata<SHA512>>::mock();
+            let missing = <AgeIntegration as Integration>::KeyId::mock_other();
+            assert!(metadata.remove_integration_key::<AgeIntegration>(&missing).unwrap().is_none());
+        }
+
+        #[test]
+        #[serial_test::serial]
+        fn decrypt_reports_mac_and_missing_data_key_errors() {
+            let _age = EnvVarGuard::set(
+                AgeIntegration::private_key_env_var_name(),
+                AgeIntegration::mock_private_key_str().as_ref(),
+            );
+            let _age_file = EnvVarGuard::set(AgeIntegration::private_key_file_path_override_env_var_name(), "/no/such/age-keys");
+
+            let mut bad_mac = RopsFileMetadata::<EncryptedMetadata<AES256GCM, SHA512>>::mock();
+            bad_mac.mac.0.authorization_tag = "AAAAAAAAAAAAAAAAAAAAAA".parse().unwrap();
+            assert!(bad_mac.decrypt().is_err());
+
+            let mut bad_mac = RopsFileMetadata::<EncryptedMetadata<AES256GCM, SHA512>>::mock();
+            bad_mac.mac.0.authorization_tag = "AAAAAAAAAAAAAAAAAAAAAA".parse().unwrap();
+            assert!(bad_mac.decrypt_and_save_mac_nonce().is_err());
+
+            let mut missing = RopsFileMetadata::<EncryptedMetadata<AES256GCM, SHA512>>::mock();
+            missing.intregation.age.clear();
+            missing.intregation.kms.clear();
+            assert!(missing.decrypt().is_err());
+
+            let mut missing = RopsFileMetadata::<EncryptedMetadata<AES256GCM, SHA512>>::mock();
+            missing.intregation.age.clear();
+            missing.intregation.kms.clear();
+            assert!(missing.decrypt_and_save_mac_nonce().is_err());
+
+            let mut bad_age = RopsFileMetadata::<EncryptedMetadata<AES256GCM, SHA512>>::mock();
+            bad_age.intregation.age.values_mut().next().unwrap().encrypted_data_key = "not armor".to_string();
+            assert!(bad_age.retrieve_data_key().is_err());
+        }
+    }
+
+    #[cfg(all(feature = "test-utils", feature = "sha2"))]
+    mod stub_cipher {
+        use crate::*;
+
+        #[test]
+        fn stub_cipher_fails_metadata_encryption() {
+            let data_key = DataKey::mock();
+            assert!(RopsFileMetadata::<DecryptedMetadata<SHA512>>::mock()
+                .encrypt::<StubCipher>(&data_key)
+                .is_err());
+
+            let saved = SavedMacNonce::<StubCipher, SHA512>::new(Mac::<SHA512>::mock(), Nonce::mock());
+            assert!(RopsFileMetadata::<DecryptedMetadata<SHA512>>::mock()
+                .encrypt_with_saved_mac_nonce(&data_key, saved)
+                .is_err());
+        }
     }
 }

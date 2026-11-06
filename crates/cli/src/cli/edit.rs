@@ -47,7 +47,8 @@ impl Cli {
 
             let encrypted_rops_file_string = decrypted_rops_file
                 .set_map(decrypted_map)?
-                .encrypt_with_saved_parameters::<_, F>(saved_parameters)?
+                .encrypt_with_saved_parameters::<_, F>(saved_parameters)
+                .expect("saved parameters still encrypt")
                 .to_string();
 
             match std::io::stdin().lock().is_terminal() {
@@ -86,15 +87,20 @@ impl Cli {
                 let mut command = Command::new(editor_command);
                 command.args(args);
                 command.arg(temp_file_path);
+                // Captured so a failing editor's stderr can be decoded below.
+                // Stdout stays attached so an interactive editor still has a terminal.
+                command.stderr(std::process::Stdio::piped());
 
                 // Capture SIGINT in order to clean up tempdir.
-                ctrlc::try_set_handler(|| ()).expect("another ctrl-c handler has already been set");
+                // A second edit in the same process cannot install another handler.
+                let _ = ctrlc::try_set_handler(|| ());
 
                 loop {
                     let output = command
                         .spawn()
                         .context(format!("failed to launch editor; '{}'", command.get_program().to_string_lossy()))?
-                        .wait_with_output()?;
+                        .wait_with_output()
+                        .expect("waiting for the editor");
 
                     if !output.status.success() {
                         let error = std::str::from_utf8(&output.stderr).context("unable to read editor stderr")?;

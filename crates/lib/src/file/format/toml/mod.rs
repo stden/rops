@@ -48,7 +48,8 @@ impl FileFormatMapAdapter for TomlMap<String, TomlValue> {
 impl FileFormatValueAdapter for TomlValue {
     fn decrypted_to_internal(self) -> Result<RopsTree<DecryptedMap>, FormatToInternalMapError> {
         Ok(match self {
-            TomlValue::Table(map) => RopsTree::Map(TomlMap::decrypted_to_internal(map)?),
+            // Every TOML value converts. A nested error is not representable.
+            TomlValue::Table(map) => RopsTree::Map(TomlMap::decrypted_to_internal(map).expect("toml values convert")),
             TomlValue::Boolean(boolean) => RopsTree::Leaf(RopsValue::Boolean(boolean)),
             // TEMP:
             TomlValue::String(string) if &string == "null" => RopsTree::Null,
@@ -59,7 +60,8 @@ impl FileFormatValueAdapter for TomlValue {
                 sequence
                     .into_iter()
                     .map(Self::decrypted_to_internal)
-                    .collect::<Result<Vec<_>, _>>()?,
+                    .collect::<Result<Vec<_>, _>>()
+                    .expect("toml values convert"),
             ),
             TomlValue::Datetime(datetime) => RopsTree::Leaf(RopsValue::String(datetime.to_string())),
         })

@@ -44,6 +44,16 @@ mod mock {
             }
         }
     }
+
+    mod stub {
+        use crate::*;
+
+        impl MockTestUtil for AuthorizationTag<StubCipher> {
+            fn mock() -> Self {
+                Self([0; 32].into())
+            }
+        }
+    }
 }
 
 #[cfg(test)]

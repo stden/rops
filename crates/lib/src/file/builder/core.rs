@@ -105,4 +105,16 @@ mod tests {
         assert_eq!(&RopsFileFormatMap::mock(), builder_rops_file.map());
         assert_ne!(&RopsFileMetadata::mock(), builder_rops_file.metadata());
     }
+
+    #[test]
+    fn encrypt_reports_invalid_maps_and_missing_keys() {
+        assert!(RopsFileBuilder::<YamlFileFormat>::new("n: 18446744073709551615\n")
+            .unwrap()
+            .encrypt::<AES256GCM, SHA512>()
+            .is_err());
+        assert!(RopsFileBuilder::<YamlFileFormat>::new("hello: world\n")
+            .unwrap()
+            .encrypt::<AES256GCM, SHA512>()
+            .is_err());
+    }
 }

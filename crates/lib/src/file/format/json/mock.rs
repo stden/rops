@@ -147,6 +147,8 @@ mod metadata {
         where
             I::Config: MockFileFormatUtil<JsonFileFormat>,
         {
+            // `INCLUDE_DATA_KEY_CREATED_AT` makes one arm dead in every monomorphization.
+            #[cfg_attr(coverage_nightly, coverage(off))]
             fn mock_format_display() -> String {
                 let proto_config = I::Config::mock_format_display();
                 let config = super::super::strip_curly_and_dedent(&proto_config);
