@@ -67,6 +67,28 @@ mod sops_reference_normalize {
 
         use super::{normalize_sops_references, to_sops_yaml, with_trailing_newline};
 
+        /// Runs `action` while writes to `path` fail. Permission bits stop regular users
+        /// (CI runners); root ignores them, so it also needs the immutable attribute.
+        fn while_unwritable<T>(path: &Path, action: impl FnOnce() -> T) -> T {
+            use std::os::unix::fs::PermissionsExt;
+
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o444)).unwrap();
+            let needs_immutable = std::fs::OpenOptions::new().write(true).open(path).is_ok();
+            if needs_immutable {
+                chattr(path, "+i");
+            }
+            let result = action();
+            if needs_immutable {
+                chattr(path, "-i");
+            }
+            result
+        }
+
+        fn chattr(path: &Path, flag: &str) {
+            let status = std::process::Command::new("chattr").arg(flag).arg(path).status().unwrap();
+            assert!(status.success(), "chattr {flag} is required to force a write error as root");
+        }
+
         #[test]
         fn leaves_a_current_cache_untouched() {
             let directory = tempdir().unwrap();
@@ -143,18 +165,8 @@ mod sops_reference_normalize {
             std::fs::write(&cache_path, "previous_files_in_directory: 0\n").unwrap();
             let reference = directory.path().join("sample.yaml");
             std::fs::write(&reference, "key: value\n").unwrap();
-            let status = std::process::Command::new("chattr")
-                .args(["+i", reference.to_str().unwrap()])
-                .status()
-                .unwrap();
-            assert!(status.success(), "chattr +i is required to force the write error");
 
-            let rewritten = normalize_sops_references(directory.path(), &cache_path);
-            let cleanup = std::process::Command::new("chattr")
-                .args(["-i", reference.to_str().unwrap()])
-                .status()
-                .unwrap();
-            assert!(cleanup.success());
+            let rewritten = while_unwritable(&reference, || normalize_sops_references(directory.path(), &cache_path));
             assert!(rewritten.is_err());
         }
 
@@ -163,18 +175,10 @@ mod sops_reference_normalize {
             let directory = tempdir().unwrap();
             let cache_path = directory.path().join("cache.yaml");
             std::fs::write(&cache_path, "previous_files_in_directory: 0\n").unwrap();
-            let reference = directory.path().join("blocked.yaml");
-            std::fs::write(&reference, "key: value\n").unwrap();
-            let status = std::process::Command::new("mount")
-                .args(["--bind", "/proc/sysrq-trigger", reference.to_str().unwrap()])
-                .status()
-                .unwrap();
-            assert!(status.success(), "bind mount is required to force the read error");
+            // Not valid UTF-8, so reading the reference as a string fails for every user.
+            std::fs::write(directory.path().join("blocked.yaml"), [0xff, 0xfe]).unwrap();
 
-            let read = normalize_sops_references(directory.path(), &cache_path);
-            let cleanup = std::process::Command::new("umount").arg(&reference).status().unwrap();
-            assert!(cleanup.success());
-            assert!(read.is_err());
+            assert!(normalize_sops_references(directory.path(), &cache_path).is_err());
         }
 
         #[test]
@@ -184,18 +188,8 @@ mod sops_reference_normalize {
             let cache_path = cache_directory.path().join("cache.yaml");
             std::fs::write(&cache_path, "previous_files_in_directory: 0\n").unwrap();
             std::fs::write(directory.path().join("sample.yaml"), "key: value\n").unwrap();
-            let status = std::process::Command::new("chattr")
-                .args(["+i", cache_path.to_str().unwrap()])
-                .status()
-                .unwrap();
-            assert!(status.success(), "chattr +i is required to force the cache write error");
 
-            let written = normalize_sops_references(directory.path(), &cache_path);
-            let cleanup = std::process::Command::new("chattr")
-                .args(["-i", cache_path.to_str().unwrap()])
-                .status()
-                .unwrap();
-            assert!(cleanup.success());
+            let written = while_unwritable(&cache_path, || normalize_sops_references(directory.path(), &cache_path));
             assert!(written.is_err());
         }
 
