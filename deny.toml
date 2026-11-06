@@ -1,4 +1,6 @@
 [advisories]
 ignore = [
   { id = "RUSTSEC-2024-0436", reason = "Upstream issue in `age`, https://github.com/str4d/rage/issues/528" },
+  { id = "RUSTSEC-2026-0374", reason = "basic-toml is unmaintained, not vulnerable. Reached only through i18n-embed-fl, a proc-macro dependency of age, so it is not linked into rops binaries." },
+  { id = "RUSTSEC-2026-0387", reason = "crypto-bigint timing issue in P-256 arithmetic. Reached through age's p256tag and mlkem768p256tag recipients, which are compiled in but never used: rops only uses age's X25519 recipients and identities (crates/lib/src/integration/age.rs). Remove when age no longer depends on p256." },
 ]
