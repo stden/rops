@@ -11,6 +11,7 @@ macro_rules! generate_integration_test_suite {
         }
 
         #[test]
+        #[serial_test::serial]
         fn encrypts_data_key() {
             $integration::set_mock_private_key_env_var();
 
@@ -25,6 +26,7 @@ macro_rules! generate_integration_test_suite {
         }
 
         #[test]
+        #[serial_test::serial]
         fn decrypts_data_key() {
             $integration::set_mock_private_key_env_var();
 
@@ -40,6 +42,7 @@ macro_rules! generate_integration_test_suite {
         }
 
         #[test]
+        #[serial_test::serial]
         fn retrieves_private_key_from_env() {
             $integration::set_mock_private_key_env_var();
 

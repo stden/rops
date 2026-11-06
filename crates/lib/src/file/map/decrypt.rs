@@ -82,6 +82,7 @@ mod tests {
         use crate::*;
 
         #[test]
+        #[serial_test::serial]
         fn decrypts_map() {
             assert_eq!(
                 RopsMap::<DecryptedMap>::mock(),
@@ -90,6 +91,7 @@ mod tests {
         }
 
         #[test]
+        #[serial_test::serial]
         fn child_failures_fail_sequences_and_nested_maps() {
             fn bad_leaf() -> RopsTree<EncryptedMap<AES256GCM>> {
                 RopsTree::Leaf(RopsMapEncryptedLeaf::Encrypted(EncryptedRopsValue {
@@ -138,6 +140,7 @@ mod tests {
         }
 
         #[test]
+        #[serial_test::serial]
         fn stub_cipher_hits_every_decrypt_error_arm() {
             let data_key = DataKey::mock();
             assert!(encrypted(encrypted_leaf()).decrypt(&data_key).is_err());

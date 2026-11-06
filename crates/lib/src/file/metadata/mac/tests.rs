@@ -32,6 +32,7 @@ mod sha2 {
         use super::*;
 
         #[test]
+        #[serial_test::serial]
         fn encrypts_mac() {
             let data_key = DataKey::mock();
             let last_modified = LastModifiedDateTime::mock();
@@ -53,6 +54,7 @@ mod sha2 {
         }
 
         #[test]
+        #[serial_test::serial]
         fn decrypts_mac() {
             assert_eq!(
                 Mac::mock(),
@@ -102,6 +104,7 @@ mod stub {
     use crate::*;
 
     #[test]
+    #[serial_test::serial]
     fn stub_cipher_cannot_encrypt_or_decrypt_a_mac() {
         assert!(Mac::<SHA512>::mock()
             .encrypt::<StubCipher>(&DataKey::mock(), &LastModifiedDateTime::mock())

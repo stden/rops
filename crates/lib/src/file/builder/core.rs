@@ -88,6 +88,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[serial_test::serial]
     fn encrypts_with_builder() {
         AgeIntegration::set_mock_private_key_env_var();
 

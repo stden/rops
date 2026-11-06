@@ -125,6 +125,7 @@ mod tests {
         }
 
         #[test]
+        #[serial_test::serial]
         fn encrypts_map_without_saving_nonces() {
             let decrypted_map = RopsMap::<DecryptedMap>::mock();
             let data_key = DataKey::mock();

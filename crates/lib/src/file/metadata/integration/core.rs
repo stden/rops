@@ -86,6 +86,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn decrypts_nothing_without_integration_units() {
         assert!(IntegrationMetadata::default().decrypt_data_key().unwrap().is_none());
     }

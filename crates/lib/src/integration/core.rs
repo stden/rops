@@ -150,6 +150,7 @@ mod stub_integration {
         }
 
         #[test]
+        #[serial_test::serial]
         #[should_panic]
         fn decrypt_data_key_is_unimplemented() {
             let _ = StubIntegration::decrypt_data_key(&String::new(), "");
@@ -182,16 +183,19 @@ mod tests {
     const STUB_KEYS: &[&str] = &["key1", "key2"];
 
     #[test]
+    #[serial_test::serial]
     fn gets_private_key_env_var_name() {
         assert_eq!("ROPS_STUB", StubIntegration::private_key_env_var_name())
     }
 
     #[test]
+    #[serial_test::serial]
     fn gets_private_key_file_path_override_env_var_name() {
         assert_eq!("ROPS_STUB_KEY_FILE", StubIntegration::private_key_file_path_override_env_var_name())
     }
 
     #[test]
+    #[serial_test::serial]
     fn gets_private_key_from_env() {
         let var_name = StubIntegration::private_key_env_var_name();
         std::env::set_var(&var_name, "key1,key2");

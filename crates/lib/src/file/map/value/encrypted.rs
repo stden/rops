@@ -197,12 +197,14 @@ mod tests {
         }
 
         #[test]
+        #[serial_test::serial]
         fn stub_decrypt_fails() {
             let error = EncryptedRopsValue::<StubCipher>::mock().decrypt(&DataKey::mock(), &KeyPath::default());
             assert!(error.is_err());
         }
 
         #[test]
+        #[serial_test::serial]
         fn decrypts_value() {
             assert_eq!(
                 RopsValue::mock(),

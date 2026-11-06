@@ -218,6 +218,7 @@ mod tests {
     type DecryptedRopsFile = RopsFile<DecryptedFile<SHA512>, YamlFileFormat>;
 
     #[test]
+    #[serial_test::serial]
     fn encrypts_rops_file() {
         AgeIntegration::set_mock_private_key_env_var();
 
@@ -232,6 +233,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn encrypts_rops_file_with_saved_parameters() {
         AgeIntegration::set_mock_private_key_env_var();
 
@@ -244,6 +246,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn decrypts_rops_file() {
         AgeIntegration::set_mock_private_key_env_var();
 
@@ -251,6 +254,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn decrypts_rops_file_and_saves_parameters() {
         AgeIntegration::set_mock_private_key_env_var();
 
@@ -261,6 +265,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn decryption_disallows_mac_mismatch() {
         AgeIntegration::set_mock_private_key_env_var();
 

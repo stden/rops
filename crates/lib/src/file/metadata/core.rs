@@ -195,6 +195,7 @@ mod tests {
         use crate::*;
 
         #[test]
+        #[serial_test::serial]
         fn encrypts_metadata() {
             assert_eq!(
                 RopsFileMetadata::mock(),
@@ -218,6 +219,7 @@ mod tests {
         }
 
         #[test]
+        #[serial_test::serial]
         fn decrypts_metadata() {
             assert_eq!(
                 RopsFileMetadata::mock(),
@@ -244,6 +246,7 @@ mod tests {
         use crate::*;
 
         #[test]
+        #[serial_test::serial]
         fn removes_key() {
             let mut metadata = RopsFileMetadata::<DecryptedMetadata<SHA512>>::mock();
             let other_key = <AgeIntegration as Integration>::KeyId::mock_other();
@@ -264,6 +267,7 @@ mod tests {
         }
 
         #[test]
+        #[serial_test::serial]
         fn key_removal_rotates_data_key() {
             let mut metadata = RopsFileMetadata::<DecryptedMetadata<SHA512>>::mock();
 
