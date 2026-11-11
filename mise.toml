@@ -1,0 +1,38 @@
+[tools]
+rust = "nightly"
+
+[tasks.check]
+run = "git diff --check"
+
+[tasks."rust:check"]
+run = "cargo check"
+
+[tasks.test]
+run = "cargo test"
+
+[tasks.build]
+run = "cargo build"
+
+[tasks."crates:cli:check"]
+run = "cargo check"
+dir = "crates/cli"
+
+[tasks."crates:cli:test"]
+run = "cargo test"
+dir = "crates/cli"
+
+[tasks."crates:cli:build"]
+run = "cargo build"
+dir = "crates/cli"
+
+[tasks."crates:lib:check"]
+run = "cargo check"
+dir = "crates/lib"
+
+[tasks."crates:lib:test"]
+run = "cargo test"
+dir = "crates/lib"
+
+[tasks."crates:lib:build"]
+run = "cargo build"
+dir = "crates/lib"
