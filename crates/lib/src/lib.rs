@@ -61,7 +61,7 @@ mod sops_reference_normalize {
 
     mod tests {
         use std::{
-            fs::{File, OpenOptions, Permissions},
+            fs::{OpenOptions, Permissions},
             os::unix::fs::PermissionsExt,
             path::{Path, PathBuf},
         };
@@ -104,10 +104,6 @@ mod sops_reference_normalize {
 
         fn write_denied(path: &Path) -> bool {
             OpenOptions::new().write(true).open(path).is_err()
-        }
-
-        fn read_denied(path: &Path) -> bool {
-            File::open(path).is_err()
         }
 
         #[test]
@@ -199,14 +195,9 @@ mod sops_reference_normalize {
             let directory = tempdir().unwrap();
             let cache_path = directory.path().join("cache.yaml");
             std::fs::write(&cache_path, "previous_files_in_directory: 0\n").unwrap();
-            let reference = directory.path().join("blocked.yaml");
-            std::fs::write(&reference, "key: value\n").unwrap();
-            let Some(_unreadable) = ModeGuard::if_enforced(&reference, 0o000, read_denied) else {
-                return;
-            };
-
-            let read = normalize_sops_references(directory.path(), &cache_path);
-            assert!(read.is_err());
+            // Invalid UTF-8 makes reading the reference as text fail for every user.
+            std::fs::write(directory.path().join("blocked.yaml"), [0xff, 0xfe]).unwrap();
+            assert!(normalize_sops_references(directory.path(), &cache_path).is_err());
         }
 
         #[test]
