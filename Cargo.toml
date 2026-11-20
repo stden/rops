@@ -17,7 +17,7 @@ aes-gcm = { version = "0.11" }
 age = "0.12"
 anyhow = "1"
 aws-arn = "0.3"
-aws-sdk-kms = { version = "1.131", default-features = false, features = ["behavior-version-latest", "default-https-client", "rt-tokio"] }
+aws-sdk-kms = { version = "1.133", default-features = false, features = ["behavior-version-latest", "default-https-client", "rt-tokio"] }
 base64 = "0.23"
 chrono = { version = "0.4", default-features = false, features = ["std", "now", "serde"] }
 clap = { version = "4", features = ["derive"] }
@@ -58,6 +58,7 @@ zeroize = { version = "1.9" }
 
 [workspace.lints.rust]
 warnings = "deny"
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(coverage, coverage_nightly)"] }
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }

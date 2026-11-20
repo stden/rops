@@ -1,5 +1,5 @@
 [tools]
-rust = "nightly"
+rust = "1.100.0"
 
 [tasks.check]
 run = "git diff --check"

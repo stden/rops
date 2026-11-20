@@ -22,7 +22,7 @@ jobs:
     name: Toml validation
     runs-on: ubuntu-latest
     container:
-      image: tamasfe/taplo:0.8.0
+      image: tamasfe/taplo:0.10.0
     steps:
       - name: Checkout sources
         uses: actions/checkout@v7

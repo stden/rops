@@ -1,4 +1,4 @@
-#![feature(coverage_attribute)]
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 const REFERENCES_DIR: &str = "tests/sops_references";
 
@@ -7,7 +7,7 @@ const REFERENCES_DIR: &str = "tests/sops_references";
 const CACHE_PATH: &str = "tests/sops_references/cache.yaml";
 
 // Covered by the library tests of this file. The build script runs only while the cache is current.
-#[coverage(off)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod normalize {
     include!("sops_reference_normalize.rs");
 }
